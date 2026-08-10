@@ -1,0 +1,14 @@
+node_modules/
+.next/
+out/
+
+# secrets and local credential store — never commit
+.env.local
+users.json
+
+# upload scratch space for the deployer
+.staging/
+
+# runtime state
+*.log
+.DS_Store

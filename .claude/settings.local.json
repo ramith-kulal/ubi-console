@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c ' *)",
+      "Bash(curl -s -o /dev/null -w \"  http://127.0.0.1:4300/login -> HTTP %{http_code}\\\\n\" http://127.0.0.1:4300/login)"
+    ]
+  }
+}

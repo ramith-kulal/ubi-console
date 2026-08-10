@@ -1,0 +1,20 @@
+{
+  "etb-ntb-frontend": {
+    "label": "ETB/NTB Customer Frontend",
+    "pm2Name": "frontend-etb-ntb",
+    "liveLink": "/home/ubi-backend/frontend/ubi-dist",
+    "releasesDir": "/home/ubi-backend/frontend/releases",
+    "restartCommand": ["pm2", "restart", "frontend-etb-ntb"],
+    "healthUrl": "http://127.0.0.1:4200/",
+    "keepReleases": 5
+  },
+  "bankers-dashboard": {
+    "label": "Bankers Dashboard (Angular)",
+    "pm2Name": "ubi-frontend",
+    "liveLink": "/home/ubi-backend/frontend/ubi-frontend-dashboard/ubi-dist",
+    "releasesDir": "/home/ubi-backend/frontend/ubi-frontend-dashboard/releases",
+    "restartCommand": ["pm2", "restart", "ubi-frontend"],
+    "healthUrl": "http://127.0.0.1:4201/",
+    "keepReleases": 5
+  }
+}
