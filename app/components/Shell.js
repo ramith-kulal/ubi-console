@@ -12,10 +12,10 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
 const NAV = [
-  { href: '/', label: 'Query', icon: '▸', soon: true },
+  { href: '/', label: 'Query', icon: '▸' },
   { href: '/deploy', label: 'Deploy', icon: '▸' },
   { href: '/releases', label: 'Releases', icon: '▸' },
-  { href: '/saved', label: 'Saved', icon: '▸', soon: true },
+  { href: '/saved', label: 'Saved', icon: '▸' },
 ];
 
 export default function Shell({ username, children }) {

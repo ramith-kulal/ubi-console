@@ -7,8 +7,8 @@ Replaces two manual workflows:
 - **Module B — Build Deployer** (built): drag-drop an Angular `dist.zip`, validate it,
   swap it in atomically, restart pm2, verify the new build is actually being served,
   auto-roll-back if it is not.
-- **Module A — Query Console** (not built yet): Oracle NoSQL query console with a
-  two-step confirm for `UPDATE`/`DELETE`. See "What is not built yet" below.
+- **Module A — Query Console** (built): browse tables by state, run statements, and
+  view / edit / delete rows. Writes are previewed and confirmed before they run.
 
 Next.js 14 (App Router), plain JavaScript, no database of its own.
 
@@ -25,7 +25,7 @@ Next.js 14 (App Router), plain JavaScript, no database of its own.
 | Health check asserts the new `main.<hash>.js` | `PM2_SERVE_SPA: true` falls back to `index.html` for every path, so an HTTP 200 proves nothing — a stale build answers 200 just as happily. |
 | Confirm tokens bind target + staged upload + sha256 | A token minted for one artifact cannot be replayed to deploy a different one, or the same one to a different target. |
 | Every computed path re-checked with `assertInside()` | Defence in depth before any write or delete. |
-| No production reference anywhere | `grep -ri "172.27.130.67\|ubistore" .` returns nothing. Loopback binding makes prod unreachable by construction. |
+| No production reference anywhere | Grepping the project for the prod proxy IP or prod store name returns nothing (see "Verification" below). The DB endpoint is hardcoded to loopback in [lib/db.js](lib/db.js), so prod is unreachable by construction rather than by policy. |
 
 **Never run** `nvm alias default 20` or `pm2 update`. The pm2 daemon runs under Node 16
 and all four existing apps inherit that interpreter; changing the default Node and then
@@ -141,12 +141,24 @@ Rollback from the Releases screen runs the same swap → restart → health-chec
 ## Tests
 
 ```bash
-npm test        # 53 tests, no test framework dependency
+npm test        # 122 tests, no test framework dependency
 ```
 
-Covers the security boundary directly: hand-crafted zip-slip / absolute-path /
-symlink-entry archives, zip-bomb ratios, wrapper detection, confirm-token binding and
-expiry, and a full deploy integration suite against a real filesystem and HTTP server.
+Covers both security boundaries directly:
+
+- **query-guard** — statement classification and channel routing, mandatory `WHERE`,
+  comments-inside-strings vs real comments, multi-statement rejection, alias handling
+  for both `UPDATE` and `DELETE` shapes, DDL object-name extraction.
+- **zip-inspect** — hand-crafted zip-slip / absolute-path / symlink-entry archives,
+  zip-bomb ratios, nested `dist/<project>/browser/` layouts, custom entry documents.
+- **confirm-token** — binding and expiry, including cross-payload replay.
+- **deploy** — a full integration suite against a real filesystem and HTTP server.
+
+To verify no production reference exists (spec §8):
+
+```bash
+grep -ri "<prod-proxy-ip>\|<prod-store-name>" . --exclude-dir=node_modules --exclude-dir=.next
+```
 
 The integration suite models the one pm2 behaviour that makes this subtle: `pm2 serve`
 resolves the served directory once and holds it, so swapping the symlink changes nothing
@@ -158,7 +170,9 @@ restart were removed entirely.
 ## Layout
 
 ```
-lib/zip-inspect.js    archive validation + diff vs live   ← most security-critical
+lib/query-guard.js    statement analysis + channel routing  ← security boundary (Module A)
+lib/zip-inspect.js    archive validation + diff vs live     ← security boundary (Module B)
+lib/db.js             NoSQL client (endpoint HARDCODED), PK lookup, key-based row ops
 lib/deploy.js         extract, swap, restart, verify, rollback, prune, lock
 lib/targets.js        server-side target allowlist + assertInside()
 lib/confirm-token.js  stateless HMAC confirm tokens
@@ -166,29 +180,95 @@ lib/staging.js        upload scratch space
 lib/auth.js           jose JWT (Edge-verifiable in middleware.js)
 scripts/migrate-target.js   one-time directory → symlink conversion
 scripts/add-user.js         bcrypt user management
-scripts/gen-tables.js       generates data/tables.json from ubi-backend (Module A)
+scripts/gen-tables.js       generates data/tables.json from ubi-backend
 ```
 
-State lives on disk by design: `users.json`, per-release `meta.json`. No app database.
+State lives on disk by design: `users.json`, `saved-queries.json`, per-release
+`meta.json`. No app database.
 
 ---
 
-## What is not built yet
+## Module A — Query Console
 
-**Module A — Query Console.** Deferred; Module B was built first. Already in place:
+### Statement policy
 
-- `data/tables.json` — generated from `ubi-backend/src/database/tables.json`
-  (26 groups, 1278 table refs) via `npm run gen-tables`. It also reports the 51 state
-  keys that ubi-backend's `generalutils/utils.js` silently shadows by spreading
-  `GENERAL` last.
-- `lib/confirm-token.js` — the two-step confirm mechanism the query console needs.
-- Sidebar nav shows Query and Saved as `SOON`; `/` redirects to `/deploy`.
+**All statement types are permitted, including DDL.** This overrides the original
+spec's SELECT/UPDATE/DELETE whitelist — a deliberate decision by the tool's owner.
+What the guard still does is make the blast radius visible before anything runs:
 
-Still to write: `lib/db.js`, `lib/query-guard.js` (+ its unit tests, first), the query
-API routes, and the console UI.
+| Statement | Treatment |
+|---|---|
+| `SELECT` | Runs immediately. `LIMIT 500` appended if you didn't set one. |
+| `INSERT` / `UPSERT` | Confirm step. No preview is possible — the rows don't exist yet. |
+| `UPDATE` / `DELETE` | **`WHERE` is mandatory.** The exact affected rows are previewed, then confirmed. |
+| `DROP` / `TRUNCATE` / `CREATE` / `ALTER` / `GRANT` | Confirm step requiring the **object name to be typed**. No preview can exist and nothing is reversible. |
 
-`data/tables.json` has **26 groups**, not the 8 named in the build spec — the extra ones
-(`MAHARASHTRA`, `OD`, `TN`, `RJ`, `GJ`, `CH`, `TR`, `AS`, plus non-state groups like
-`SATSURE`, `PROFILE`, `CIBIL`) are real blocks in `tables.json`. The generator groups
-faithfully rather than flattening, so the state filter should be built from the generated
-file, not hardcoded.
+The `WHERE` requirement on `UPDATE`/`DELETE` is kept because a row-level preview is
+genuinely achievable there, so running blind buys nothing. DDL has no such option,
+hence the typed confirmation instead.
+
+Still refused outright, for all statement types:
+
+- **More than one statement per run** — two statements would share one confirmation.
+- **SQL comments** (`--`, `/* */`) — an apostrophe inside `/* it's fine */`
+  desynchronises quote tracking, so the preview could describe different rows than the
+  statement touches. That silent divergence is the worst failure this module can have.
+- Unterminated strings, unbalanced parens, ambiguous `WHERE`.
+
+### Execution channels
+
+Oracle NoSQL does not accept DDL through `query()`. [lib/query-guard.js](lib/query-guard.js)
+classifies each statement and [lib/db.js](lib/db.js) dispatches it:
+
+- `query()` — SELECT, INSERT, UPSERT, UPDATE, DELETE
+- `tableDDL()` — CREATE/DROP/ALTER TABLE, CREATE/DROP INDEX, TRUNCATE
+- `adminDDL()` — GRANT, REVOKE, namespace/user/role statements
+
+Getting this wrong means DDL simply fails, so the routing is functional, not cosmetic.
+
+### Confirm tokens
+
+A write needs an HMAC token bound to the **exact statement text**, minted by
+`/api/query/preview`. A token from `DELETE … WHERE id='1'` will not authorise
+`… id='2'`, nor a different table, nor a different case. 120s TTL.
+
+### Row editing
+
+Clicking ✎ on a result row opens an editor that uses the driver's `get`/`put`/`delete`
+by **full primary key** rather than SQL text — mirroring `deleteQuery` /
+`deleteQueryV2..V4` in ubi-backend's `sqlqueries.js`. For the most common operation in
+this console (fixing or removing one applicant / custid record) there is then no clause
+to mistype and no chance of matching more rows than intended.
+
+The primary key is read from the database via `getTable()`, never hardcoded — a wrong
+key would mean an "edit" silently writing a new row and leaving the original behind.
+Primary key columns are not editable for the same reason, and a partial key is rejected.
+
+Note `put()` replaces the **whole row**, so the editor merges scalar edits over the
+loaded row rather than sending a patch. Nested fields (`profile`, `docs`, `trackerObj`,
+`crifReport`) are edited via the JSON tab.
+
+### Table browser
+
+`data/tables.json` is generated from `ubi-backend/src/database/tables.json` by
+`npm run gen-tables` — **26 groups, 1278 table refs**, not the 8 named in the build
+spec. The extra ones (`MAHARASHTRA`, `OD`, `TN`, `RJ`, `GJ`, `CH`, `TR`, `AS`, plus
+non-state blocks like `SATSURE`, `PROFILE`, `CIBIL`) are real. Grouping is faithful
+rather than flattened.
+
+The generator also reports the **51 state keys shadowed by `GENERAL`**: ubi-backend's
+`generalutils/utils.js` spreads the `GENERAL` block last, so a key present in both
+silently resolves to the GENERAL table there. Those are tagged `shadowed` in the rail,
+because the one place that ambiguity must not exist is the screen where someone is
+deciding which physical table to edit.
+
+Regenerate after a `tables.json` change:
+
+```bash
+npm run gen-tables    # needs the ubi-backend checkout; pass --source if it moved
+```
+
+### Saved queries
+
+Clicking a saved query **loads it into the editor and nothing more**. There is
+deliberately no one-click path from the list to a destructive statement.
