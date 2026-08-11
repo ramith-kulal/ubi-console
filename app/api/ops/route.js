@@ -23,6 +23,7 @@ import {
   OpsActionError,
   OPS_TABLE_KEYS,
   SEARCH_FIELDS,
+  NULLABLE_PATHS,
 } from '@/lib/ops-actions';
 import { runQuery, formatDbError, describeEndpoint } from '@/lib/db';
 
@@ -73,6 +74,7 @@ export async function GET() {
       tableKeys: OPS_TABLE_KEYS,
       searchFields: SEARCH_FIELDS,
       statuses: loadStatuses(),
+      nullablePaths: NULLABLE_PATHS,
       actions: listActions(),
     });
   } catch (err) {
@@ -136,6 +138,7 @@ export async function POST(request) {
         stateGroup: body.state,
         id: body.id,
         status: body.status,
+        path: body.path,
       });
 
       console.log(

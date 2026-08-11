@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import ResultsGrid from './ResultsGrid';
 
 const TABLE_LABELS = {
-  APPLICANT: 'Applicant',
+  APPLICANTS_NEW_LOAN_CASES: 'New loan cases',
   CUSTID_DETAILS: 'CustID details',
   CLOGIN: 'Banker logins (CLOGIN)',
 };
@@ -30,7 +30,7 @@ export default function OpsConsole() {
   const [configError, setConfigError] = useState(null);
 
   const [state, setState] = useState('KARNATAKA');
-  const [tableKey, setTableKey] = useState('CUSTID_DETAILS');
+  const [tableKey, setTableKey] = useState('APPLICANTS_NEW_LOAN_CASES');
   const [field, setField] = useState('custId');
   const [value, setValue] = useState('');
 
@@ -42,6 +42,7 @@ export default function OpsConsole() {
   const [pending, setPending] = useState(null); // {plan, preview}
   const [typedConfirm, setTypedConfirm] = useState('');
   const [statusChoice, setStatusChoice] = useState('');
+  const [pathChoice, setPathChoice] = useState('');
   const [busy, setBusy] = useState(false);
 
   /* ------------------------------------------------------------- config */
@@ -56,6 +57,7 @@ export default function OpsConsole() {
         }
         setConfig(data);
         if (data.statuses?.length) setStatusChoice(data.statuses[0].value);
+        if (data.nullablePaths?.length) setPathChoice(data.nullablePaths[0].path);
       } catch (err) {
         setConfigError(err.message);
       }
@@ -88,8 +90,6 @@ export default function OpsConsole() {
         value: overrides.value ?? value,
         limit: 50,
       };
-      if (!String(payload.value).trim()) return;
-
       setSearching(true);
       setError(null);
       setNotice(null);
@@ -115,6 +115,20 @@ export default function OpsConsole() {
     [state, tableKey, field, value]
   );
 
+  /**
+   * Load the table's contents as soon as the screen (or the state / table
+   * selection) is ready, with no filter. The team looks first and narrows second,
+   * so opening on an empty box would just mean an extra click every time.
+   *
+   * Deliberately keyed on state+table only: re-running on every keystroke in the
+   * value box would fire a query per character.
+   */
+  useEffect(() => {
+    if (!config) return;
+    runSearch({ value: '' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config, state, tableKey]);
+
   /* --------------------------------------------------- action: plan+preview */
 
   /**
@@ -138,6 +152,7 @@ export default function OpsConsole() {
           state,
           id: row.id,
           status: statusChoice,
+          path: pathChoice,
         }),
       });
       const plan = await planRes.json();
@@ -283,9 +298,9 @@ export default function OpsConsole() {
               type="button"
               className="btn btn-primary"
               onClick={() => runSearch()}
-              disabled={searching || !value.trim()}
+              disabled={searching}
             >
-              {searching ? '…' : 'Search'}
+              {searching ? '…' : value.trim() ? 'Search' : 'Reload'}
             </button>
           </div>
 
@@ -315,7 +330,7 @@ export default function OpsConsole() {
       ) : null}
 
       {/* ------------------------------------------------- status selector */}
-      {tableKey === 'APPLICANT' ? (
+      {tableKey === 'APPLICANTS_NEW_LOAN_CASES' ? (
         <div className="panel">
           <div className="panel-head">
             <span>Application status to set</span>
@@ -343,6 +358,29 @@ export default function OpsConsole() {
               {config.statuses.length} values, generated from ubi-backend
               APP_JOURNEY_STATUS. Anything outside this list has to go through the
               Terminal.
+            </div>
+
+            <div className="ops-search" style={{ marginTop: 12 }}>
+              <div className="ops-field ops-field-grow">
+                <label className="rail-label" htmlFor="ops-path">
+                  field to clear / null
+                </label>
+                <select
+                  id="ops-path"
+                  value={pathChoice}
+                  onChange={(e) => setPathChoice(e.target.value)}
+                >
+                  {(config.nullablePaths || []).map((p) => (
+                    <option key={p.path} value={p.path}>
+                      {p.label} → {p.clear}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="faint mono-sm" style={{ marginTop: 6 }}>
+              Used by “Clear / null a field”. File arrays are set to [] and whole
+              objects to null, matching how the application checks them.
             </div>
           </div>
         </div>
@@ -391,7 +429,7 @@ export default function OpsConsole() {
                         }
                         onClick={() => startAction(action.action, row)}
                       >
-                        {action.label}
+                        {action.needsPath ? `Clear ${pathChoice}` : action.label}
                       </button>
                     ))}
                   </div>
