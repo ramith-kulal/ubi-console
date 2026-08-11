@@ -1076,52 +1076,62 @@ table.grid tr.is-live:hover {
 
 /* ---------------------------------------------------- operations screen */
 
-.ops-search {
+/* One toolbar line: state, table, field, value, Search. Nothing that is only
+   needed at the moment of acting lives here — that is what the dialog is for. */
+.ops-bar {
   display: flex;
-  align-items: flex-end;
-  gap: 9px;
-  flex-wrap: wrap;
-}
-.ops-field {
-  display: flex;
-  flex-direction: column;
-  min-width: 150px;
-}
-.ops-field-grow {
-  flex: 1;
-  min-width: 220px;
-}
-.ops-field select,
-.ops-field input {
-  width: 100%;
-}
-
-.ops-rows {
-  display: flex;
-  flex-direction: column;
-}
-
-/* One card per matched record: the actions belong to a specific row, and a
-   button floating above a grid makes it ambiguous which row it would hit. */
-.ops-row {
-  border-bottom: 1px solid var(--border);
-  padding: 9px 11px;
-  display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 7px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
 }
-.ops-row:hover {
+.ops-bar select {
+  width: auto;
+  min-width: 120px;
+}
+.ops-bar-input {
+  width: auto;
+  flex: 1;
+  min-width: 180px;
+}
+
+/* One line per record: the few fields worth scanning, then the actions. */
+.ops-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 11px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+.ops-item:last-child {
+  border-bottom: none;
+}
+.ops-item:hover {
   background: var(--bg-hover);
 }
-.ops-row-head {
+
+.ops-item-data {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 16px;
   flex-wrap: wrap;
+  min-width: 0;
+  flex: 1;
 }
-.ops-row-actions {
+.ops-kv {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.ops-kv .faint {
+  margin-right: 3px;
+}
+
+.ops-item-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 5px;
+  flex: none;
 }
