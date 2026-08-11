@@ -1,0 +1,73 @@
+{
+  "generatedBy": "scripts/gen-app-statuses.js",
+  "source": "/Users/ramith/Desktop/whatsloan/ubi-backend/src/config/constants.json",
+  "note": "appStatus values for the APPLICANT table. Generated from APP_JOURNEY_STATUS; a few values seen only in ubi-backend code are appended explicitly.",
+  "statuses": [
+    {
+      "key": "SATSURE_REPORT_GENERATED",
+      "value": "satsureReportGenerated",
+      "label": "Satsure Report Generated",
+      "source": "APP_JOURNEY_STATUS"
+    },
+    {
+      "key": "SATSURE_REPORT_FAILED",
+      "value": "satsureReportFailed",
+      "label": "Satsure Report Failed",
+      "source": "APP_JOURNEY_STATUS"
+    },
+    {
+      "key": "LAND_RECORD",
+      "value": "LAND_RECORD",
+      "label": "Land Record generated",
+      "source": "APP_JOURNEY_STATUS"
+    },
+    {
+      "key": "DOCS_EXECUTED",
+      "value": "docsExecuted",
+      "label": "Document for NESL was ready",
+      "source": "APP_JOURNEY_STATUS"
+    },
+    {
+      "key": "DOCS_EXECUTED_REQUEST",
+      "value": "docsExecutedRequest",
+      "label": "Document is being sent to NESL",
+      "source": "APP_JOURNEY_STATUS"
+    },
+    {
+      "key": "LOAN_DISBURSED",
+      "value": "loanDisbursed",
+      "label": "LOAN is disbursed",
+      "source": "APP_JOURNEY_STATUS"
+    },
+    {
+      "key": "CROP_PATTERN_SUBMITTED",
+      "value": "cropPatternSubmitted",
+      "label": "Cropping pattern submitted successfully",
+      "source": "APP_JOURNEY_STATUS"
+    },
+    {
+      "key": "CROP_PATTERN_FAILED",
+      "value": "cropPatternFailed",
+      "label": "Cropping pattern submission failed",
+      "source": "APP_JOURNEY_STATUS"
+    },
+    {
+      "key": "LOAN_REFNO_GENERATED",
+      "value": "loanRefNoGenerated",
+      "label": "Loan reference number is generated",
+      "source": "APP_JOURNEY_STATUS"
+    },
+    {
+      "key": "LOAN_AMOUNT_CALCULATED",
+      "value": "loanAmountCalculated",
+      "label": "Loan amount calculated successfully",
+      "source": "APP_JOURNEY_STATUS"
+    },
+    {
+      "key": "LOAN_AMOUNT_CALCULATION_FAILED",
+      "value": "loanAmountCalculationFailed",
+      "label": "Loan amount calculation failed",
+      "source": "APP_JOURNEY_STATUS"
+    }
+  ]
+}

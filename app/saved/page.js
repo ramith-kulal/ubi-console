@@ -5,7 +5,7 @@
  *
  * Clicking one LOADS it into the editor. It never executes. There is deliberately
  * no one-click path from this list to a destructive statement — whoever runs it
- * still goes through preview and confirmation on the Query screen.
+ * still goes through preview and confirmation on the Terminal screen.
  */
 
 import { Fragment, useCallback, useEffect, useState } from 'react';
@@ -67,7 +67,7 @@ export default function SavedPage() {
     } catch {
       /* sessionStorage unavailable — the user can still copy the text */
     }
-    router.push('/');
+    router.push('/terminal');
   }
 
   return (
@@ -95,7 +95,7 @@ export default function SavedPage() {
           <div className="empty">loading…</div>
         ) : queries.length === 0 ? (
           <div className="empty">
-            Nothing saved yet. Use “Save…” on the Query screen.
+            Nothing saved yet. Use “Save…” on the Terminal screen.
           </div>
         ) : (
           <table className="grid">

@@ -1073,3 +1073,55 @@ table.grid tr.is-live:hover {
 .modal-wide {
   max-width: 940px;
 }
+
+/* ---------------------------------------------------- operations screen */
+
+.ops-search {
+  display: flex;
+  align-items: flex-end;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.ops-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+}
+.ops-field-grow {
+  flex: 1;
+  min-width: 220px;
+}
+.ops-field select,
+.ops-field input {
+  width: 100%;
+}
+
+.ops-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+/* One card per matched record: the actions belong to a specific row, and a
+   button floating above a grid makes it ambiguous which row it would hit. */
+.ops-row {
+  border-bottom: 1px solid var(--border);
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.ops-row:hover {
+  background: var(--bg-hover);
+}
+.ops-row-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ops-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
