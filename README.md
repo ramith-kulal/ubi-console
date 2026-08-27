@@ -9,6 +9,9 @@ Replaces two manual workflows:
   auto-roll-back if it is not.
 - **Module A — Query Console** (built): browse tables by state, run statements, and
   view / edit / delete rows. Writes are previewed and confirmed before they run.
+- **Module C — Bypass flags** (built): edit `ubi-backend/src/config/bypass.json` as
+  switches, then back up, write atomically, restart pm2 and verify — instead of
+  `nano src/config/bypass.json` followed by `pm2 restart 0`.
 
 Next.js 14 (App Router), plain JavaScript, no database of its own.
 
@@ -24,6 +27,9 @@ Next.js 14 (App Router), plain JavaScript, no database of its own.
 | Zip-slip guard in [lib/zip-inspect.js](lib/zip-inspect.js) | Archive extraction is the classic path-traversal RCE. `../`, absolute paths, drive prefixes, NUL bytes and symlink entries are all rejected from the archive *listing*, before a byte is written. |
 | Health check asserts the new `main.<hash>.js` | `PM2_SERVE_SPA: true` falls back to `index.html` for every path, so an HTTP 200 proves nothing — a stale build answers 200 just as happily. |
 | Confirm tokens bind target + staged upload + sha256 | A token minted for one artifact cannot be replayed to deploy a different one, or the same one to a different target. |
+| Bypass flags: only keys already in the file, with their existing types | The browser cannot invent a flag, delete one, or turn a boolean into a list. A typo'd flag name would be a flag the backend never reads — a bypass that silently does nothing is the worst outcome available here, so it is refused rather than written. |
+| Bypass writes are atomic (temp file + `rename`) and preceded by a backup | `require('./bypass.json')` in a running backend can read a file mid-write. A rename means a reader sees the old file or the new one, never half of one. |
+| Bypass changes are digest-bound both ways | The confirm token binds the file as reviewed **and** the file to be written, so a concurrent `nano` session over SSH is detected and refused rather than clobbered. |
 | Every computed path re-checked with `assertInside()` | Defence in depth before any write or delete. |
 | No production reference anywhere | Grepping the project for the prod proxy IP or prod store name returns nothing (see "Verification" below). The DB endpoint is hardcoded to loopback in [lib/db.js](lib/db.js), so prod is unreachable by construction rather than by policy. |
 
@@ -138,10 +144,78 @@ Rollback from the Releases screen runs the same swap → restart → health-chec
 
 ---
 
+## Module C — Bypass flags
+
+`/bypass` renders `src/config/bypass.json` as one row per key, in file order, and
+replaces the SSH loop:
+
+```
+nano src/config/bypass.json   →   pm2 restart 0
+```
+
+Three things went wrong with that. `nano` writes an invalid JSON file just as happily
+as a valid one, and the backend then fails to boot on a file nobody kept a copy of.
+`pm2 restart 0` addresses a process by index, and indexes move. And there was no record
+of who turned `V1_ENCRYPTION_BYPASS` on, or when.
+
+**Editing is local until "Review changes".** A mis-click on a switch must not be a
+restart of the backend. The review step is server-side, because the editable keys and
+their types come from the file, not from the browser:
+
+| Value in the file | Control | Accepted |
+|---|---|---|
+| `true` / `false` | switch | boolean only |
+| `"uat"` | text | printable, single line, ≤ 200 chars |
+| `3` | text | finite number |
+| `["bre_status", ...]` | text, comma-separated | `[A-Za-z0-9_.-]{1,64}` per entry, no duplicates |
+| `{ ... }`, `null`, mixed array | shown, not editable | — |
+
+Then confirm → `POST /api/bypass/apply`, streamed over SSE:
+
+- **backup** — the current file is copied to `.bypass-backups/bypass-<ts>-<user>.json`
+  *before* anything is written
+- **write** — temp file in the same directory, `fsync`, `rename`; the original file mode
+  is preserved and the file's own indentation is detected and reproduced
+- **restart** — `pm2 restart <name>` (by name, never by index) via `execFile`, argv array,
+  no shell
+- **health** — `pm2 jlist` polled with backoff, and the process must be `online` in **two
+  consecutive samples with the same restart count**. One `online` sample proves nothing:
+  a crash-looping app is online for a fraction of a second at a time, which is exactly
+  what a bypass.json the backend cannot boot with produces.
+- **prune** to `keepBackups` (30)
+
+Health failure → the backup is written back and pm2 restarted again, so a bad flag value
+self-heals. If even that fails, the log says where the backup file is.
+
+Every write is appended to `data/bypass-audit.jsonl` — `written` as soon as the bytes
+land, then `verified` or `rolled-back` — and the last 25 entries are shown under the
+panel. These flags disable OTP verification, payload encryption and credit-bureau calls;
+"who turned this on, and is it still on" is a question that gets asked after the fact,
+by which point the pm2 log has rotated.
+
+The target is configured in [bypass-targets.json](bypass-targets.json) — path, pm2 name
+and restart argv, none of which the browser can supply:
+
+```json
+{
+  "ubi-backend": {
+    "configPath": "/home/ubi-backend/ubi-backend/src/config/bypass.json",
+    "restartCommand": ["pm2", "restart", "ubi-backend"],
+    "healthUrl": null
+  }
+}
+```
+
+Set `healthUrl` to a backend URL to also require an HTTP response below 500 before a
+change is accepted; with `null`, the health gate asserts the process is up but not that
+it serves correct responses, and the UI says so.
+
+---
+
 ## Tests
 
 ```bash
-npm test        # 122 tests, no test framework dependency
+npm test        # 205 tests, no test framework dependency
 ```
 
 Covers both security boundaries directly:
@@ -153,6 +227,10 @@ Covers both security boundaries directly:
   zip-bomb ratios, nested `dist/<project>/browser/` layouts, custom entry documents.
 - **confirm-token** — binding and expiry, including cross-payload replay.
 - **deploy** — a full integration suite against a real filesystem and HTTP server.
+- **bypass** — a full integration suite against a real filesystem and a real child
+  process. The fake `pm2` reads the config file it was pointed at and reports `errored`
+  when it contains `BROKEN: true`, so the health gate and the auto-restore are actually
+  exercised; a double that always reported `online` would pass with both deleted.
 
 To verify no production reference exists (spec §8):
 
@@ -174,6 +252,7 @@ lib/query-guard.js    statement analysis + channel routing  ← security boundar
 lib/zip-inspect.js    archive validation + diff vs live     ← security boundary (Module B)
 lib/db.js             NoSQL client (endpoint HARDCODED), PK lookup, key-based row ops
 lib/deploy.js         extract, swap, restart, verify, rollback, prune, lock
+lib/bypass.js         bypass.json read/validate/atomic-write, restart, verify, restore (Module C)
 lib/targets.js        server-side target allowlist + assertInside()
 lib/confirm-token.js  stateless HMAC confirm tokens
 lib/staging.js        upload scratch space

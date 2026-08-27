@@ -1135,3 +1135,143 @@ table.grid tr.is-live:hover {
   gap: 5px;
   flex: none;
 }
+
+/* --------------------------------------------------------- bypass flags screen */
+
+/* One row per key in the file, in file order. The name is the widest column
+   because these names are long and the difference between
+   FRESHCASE_KA_LAND_BRE_BYPASS_ALL and RENEWAL_KA_LAND_BRE_BYPASS_ALL is the
+   part a reader must not miss. */
+.flag-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.flag-row {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) 52px minmax(160px, 260px) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 11px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  border-left: 2px solid transparent;
+}
+.flag-row:last-child {
+  border-bottom: none;
+}
+.flag-row:hover {
+  background: var(--bg-hover);
+}
+.flag-row.changed {
+  background: var(--accent-bg);
+  border-left-color: var(--accent);
+}
+
+.flag-name {
+  font-family: var(--mono);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.flag-type {
+  justify-self: start;
+}
+.flag-control {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.flag-input {
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+.flag-after {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+  min-height: 22px;
+}
+
+/* A switch rather than a checkbox: the state of a bypass has to be readable at
+   a glance across ~20 rows, and ON/OFF next to it says which way is which. */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  cursor: pointer;
+  color: var(--text-dim);
+}
+.switch-track {
+  position: relative;
+  width: 30px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-strong);
+  transition: background 90ms linear;
+}
+.switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  transition: transform 90ms linear, background 90ms linear;
+}
+.switch.on .switch-track {
+  background: var(--warn-bg);
+  border-color: color-mix(in srgb, var(--warn) 55%, transparent);
+}
+.switch.on .switch-knob {
+  transform: translateX(14px);
+  background: var(--warn);
+}
+.switch-label {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.4px;
+}
+.switch.on .switch-label {
+  color: var(--warn);
+  font-weight: 600;
+}
+.switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.bypass-diff {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-inset);
+}
+.bypass-diff-line {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  padding: 6px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  font-size: 12px;
+}
+.bypass-diff-line:last-child {
+  border-bottom: none;
+}
+.bypass-diff-key {
+  font-family: var(--mono);
+  font-size: 12px;
+  min-width: 240px;
+}
+
+.bypass-file {
+  white-space: pre;
+  max-height: 320px;
+}

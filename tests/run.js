@@ -11,6 +11,7 @@ await import('./confirm-token.test.js');
 await import('./zip-inspect.test.js');
 await import('./query-guard.test.js');
 await import('./ops-actions.test.js');
+await import('./bypass.test.js');
 await import('./deploy.integration.test.js');
 
 const ok = await run();

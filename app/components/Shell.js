@@ -14,6 +14,7 @@ import { usePathname, useRouter } from 'next/navigation';
 const NAV = [
   { href: '/', label: 'Operations', icon: '▸' },
   { href: '/terminal', label: 'Terminal', icon: '▸' },
+  { href: '/bypass', label: 'Bypass flags', icon: '▸' },
   { href: '/deploy', label: 'Deploy', icon: '▸' },
   { href: '/releases', label: 'Releases', icon: '▸' },
   { href: '/saved', label: 'Saved', icon: '▸' },

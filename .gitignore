@@ -11,4 +11,5 @@ users.json
 
 # runtime state
 *.log
+data/bypass-audit.jsonl
 .DS_Store

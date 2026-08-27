@@ -1,0 +1,11 @@
+{
+  "ubi-backend": {
+    "label": "UBI Backend — bypass flags",
+    "pm2Name": "ubi-backend",
+    "configPath": "/home/ubi-backend/ubi-backend/src/config/bypass.json",
+    "backupsDir": "/home/ubi-backend/ubi-backend/src/config/.bypass-backups",
+    "restartCommand": ["pm2", "restart", "ubi-backend"],
+    "healthUrl": null,
+    "keepBackups": 30
+  }
+}

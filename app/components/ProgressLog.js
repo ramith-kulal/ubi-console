@@ -24,7 +24,17 @@ const ROLLBACK_STEPS = [
   { name: 'health', label: 'Health check (asserts bundle)' },
 ];
 
+const BYPASS_STEPS = [
+  { name: 'backup', label: 'Back up the current bypass.json' },
+  { name: 'write', label: 'Atomic write (temp file + rename)' },
+  { name: 'restart', label: 'pm2 restart' },
+  { name: 'health', label: 'Verify the process stays online' },
+  { name: 'prune', label: 'Prune old backups' },
+];
+
 const ICONS = { pending: '·', running: '⟳', ok: '✓', failed: '✗' };
+
+const MODES = { deploy: DEPLOY_STEPS, rollback: ROLLBACK_STEPS, bypass: BYPASS_STEPS };
 
 export default function ProgressLog({ steps, logs, mode = 'deploy' }) {
   const logRef = useRef(null);
@@ -33,12 +43,18 @@ export default function ProgressLog({ steps, logs, mode = 'deploy' }) {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [logs]);
 
-  const definition = mode === 'rollback' ? ROLLBACK_STEPS : DEPLOY_STEPS;
+  const definition = MODES[mode] || DEPLOY_STEPS;
   const rolledBack = Boolean(steps.rollback);
 
   const shown = [...definition];
   if (rolledBack) {
-    shown.push({ name: 'rollback', label: 'Automatic rollback to previous release' });
+    shown.push({
+      name: 'rollback',
+      label:
+        mode === 'bypass'
+          ? 'Automatic rollback to the previous bypass.json'
+          : 'Automatic rollback to previous release',
+    });
   }
 
   return (
