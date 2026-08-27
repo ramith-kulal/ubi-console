@@ -33,8 +33,10 @@ export const runtime = 'nodejs';
 
 async function describeTarget(summary) {
   const target = getBypassTarget(summary.key);
-
   const out = { ...summary, config: null, error: null, backups: [], process: null };
+
+  const snapshot = await pm2Snapshot(target);
+  out.process = snapshot.ok ? snapshot : { ok: false, reason: snapshot.reason };
 
   try {
     const current = await readConfig(target);
@@ -50,9 +52,6 @@ async function describeTarget(summary) {
   }
 
   out.backups = await listBackups(target);
-
-  const snapshot = await pm2Snapshot(target);
-  out.process = snapshot.ok ? snapshot : { ok: false, reason: snapshot.reason };
 
   return out;
 }

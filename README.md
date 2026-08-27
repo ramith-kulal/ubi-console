@@ -173,7 +173,7 @@ their types come from the file, not from the browser:
 Then confirm → `POST /api/bypass/apply`, streamed over SSE:
 
 - **backup** — the current file is copied to `.bypass-backups/bypass-<ts>-<user>.json`
-  *before* anything is written
+  (beside the config file) *before* anything is written
 - **write** — temp file in the same directory, `fsync`, `rename`; the original file mode
   is preserved and the file's own indentation is detected and reproduced
 - **restart** — `pm2 restart <name>` (by name, never by index) via `execFile`, argv array,
@@ -199,7 +199,7 @@ and restart argv, none of which the browser can supply:
 ```json
 {
   "ubi-backend": {
-    "configPath": "/home/ubi-backend/ubi-backend/src/config/bypass.json",
+    "configPath": "/home/ubi-backend/server/ubi-backend/src/config/bypass.json",
     "restartCommand": ["pm2", "restart", "ubi-backend"],
     "healthUrl": null
   }

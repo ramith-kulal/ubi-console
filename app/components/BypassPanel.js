@@ -295,7 +295,7 @@ export default function BypassPanel({ target, onChanged }) {
               <div style={{ marginTop: 4 }}>{target.error.message}</div>
               <div className="mono-sm" style={{ marginTop: 6 }}>
                 Nothing is written until the file parses. Fix it on the instance, or check
-                bypass-targets.json if the path is wrong.
+                configPath in bypass-targets.json.
               </div>
             </div>
           </div>
