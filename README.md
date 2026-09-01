@@ -318,6 +318,30 @@ A write needs an HMAC token bound to the **exact statement text**, minted by
 `/api/query/preview`. A token from `DELETE … WHERE id='1'` will not authorise
 `… id='2'`, nor a different table, nor a different case. 120s TTL.
 
+### Operations screen
+
+`/` is the everyday-task screen: pick a state and a table, search, act on a row. It
+builds no SQL in the browser — [lib/ops-actions.js](lib/ops-actions.js) does that, so a
+custId typed into the search box cannot break out of its literal and widen a `WHERE`.
+
+Two interaction rules it follows:
+
+- **The value is the control.** `appStatus` is a dropdown on the row itself, showing what
+  the row currently holds. Picking a new status goes straight to the confirm dialog — it
+  used to be a button that opened a dialog that contained the dropdown, which was three
+  clicks to change one field. If a row holds a status that is not in
+  `data/app-statuses.json`, that value is added to its own dropdown rather than the
+  select silently displaying a different one.
+- **One header, not a label per value.** Results are fixed columns with the field names
+  in a single sticky header. Repeating `custId … applicant_name …` on every row meant
+  nothing lined up, so scanning a result set was reading rather than glancing.
+
+The remaining actions (clear a field, reset a land record, delete) are one `actions…`
+menu per row instead of four buttons; the field-clear allowlist from `NULLABLE_PATHS` is
+an option group inside it. Every entry still goes plan → `/api/query/preview` → confirm →
+`/api/query/execute`, so the affected-row count, the exact statement, and any typed
+confirmation are unchanged.
+
 ### Row editing
 
 Clicking ✎ on a result row opens an editor that uses the driver's `get`/`put`/`delete`

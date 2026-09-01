@@ -3,16 +3,22 @@
 /**
  * OpsConsole — the everyday tasks, without writing SQL.
  *
- * Layout is deliberately flat: one toolbar, one list of rows, one dialog.
+ * Layout is deliberately flat: one toolbar, one aligned table, one dialog.
  *
- * An earlier version put the status and field-path pickers in permanent panels
- * above the results. They were only ever needed at the moment of acting, and they
- * pushed the actual data below the fold — so they now live inside the dialog, and
- * the screen is just "what did I find" plus "what do I want to do to this row".
+ * Two things this screen learned the hard way:
+ *
+ *   - Repeating the field name beside every value on every row (`custId UBI123
+ *     applicant_name …`) meant nothing lined up between rows, so scanning a
+ *     result set was reading rather than glancing. The names are now a single
+ *     header and the values sit in fixed columns.
+ *   - "Set application status" as a button that opened a dialog containing a
+ *     dropdown was three clicks to change one field. The dropdown is now the
+ *     control itself, on the row: pick a status and the only thing left is
+ *     confirming what it will run.
  *
  * Every action still goes plan → preview → confirm through the same endpoints as
- * the Terminal, so a button cannot do anything the guard would refuse and you
- * always see the affected rows first.
+ * the Terminal, so a button here cannot do anything the guard would refuse, and
+ * the affected-row count and the exact statement are always shown first.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -26,9 +32,22 @@ const TABLE_LABELS = {
 
 /** The few columns worth showing per row; everything else is behind "view". */
 const SUMMARY_FIELDS = {
-  APPLICANTS_NEW_LOAN_CASES: ['custId', 'applicant_name', 'mobile_no', 'appStatus'],
+  APPLICANTS_NEW_LOAN_CASES: ['custId', 'applicant_name', 'mobile_no'],
   CUSTID_DETAILS: ['custId', 'acc_no', 'mobile_no', 'state'],
   CLOGIN: ['userName', 'mobileNo', 'email', 'staffId'],
+};
+
+/** Column widths, so ids and phone numbers do not wobble between rows. */
+const WIDTHS = {
+  custId: '170px',
+  applicant_name: 'minmax(140px, 1fr)',
+  mobile_no: '110px',
+  mobileNo: '110px',
+  acc_no: '160px',
+  state: '80px',
+  userName: 'minmax(120px, 1fr)',
+  email: 'minmax(160px, 1fr)',
+  staffId: '100px',
 };
 
 export default function OpsConsole() {
@@ -45,7 +64,7 @@ export default function OpsConsole() {
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
 
-  const [dialog, setDialog] = useState(null); // {action, row, param, plan, preview}
+  const [dialog, setDialog] = useState(null); // {action, row, param, label, plan, preview}
   const [typed, setTyped] = useState('');
   const [viewRow, setViewRow] = useState(null);
 
@@ -125,18 +144,37 @@ export default function OpsConsole() {
     [config, tableKey]
   );
 
-  function openDialog(action, row) {
-    setTyped('');
-    // Actions that need a choice open on that choice; the rest go straight to
-    // fetching the preview.
-    const needsChoice = action.needsPath || action.action === 'set-app-status';
-    const param = action.needsPath
-      ? config.nullablePaths?.[0]?.path
-      : config.statuses?.[0]?.value;
+  const statusAction = actions.find((a) => a.action === 'set-app-status') || null;
+  const pathAction = actions.find((a) => a.needsPath) || null;
+  /** Everything that is neither the status dropdown nor a path clear. */
+  const otherActions = actions.filter((a) => a.action !== 'set-app-status' && !a.needsPath);
 
-    const next = { action, row, param, plan: null, preview: null };
+  /** The row's columns: fields, then the status dropdown, then the controls. */
+  const columns = useMemo(() => {
+    const cols = (SUMMARY_FIELDS[tableKey] || []).map((key) => ({
+      key,
+      kind: 'field',
+      width: WIDTHS[key] || 'minmax(120px, 1fr)',
+    }));
+    if (statusAction) cols.push({ key: 'appStatus', kind: 'status', width: '250px' });
+    // Fixed, not `auto`: an auto column is empty in the header row and holds two
+    // controls in the data rows, so the flexible column would absorb a different
+    // amount of space in each and the header would not line up with the values.
+    cols.push({ key: '__actions', kind: 'actions', width: '160px' });
+    return cols;
+  }, [tableKey, statusAction]);
+
+  const template = columns.map((c) => c.width).join(' ');
+
+  /**
+   * Every action is opened with its parameter already chosen, so the dialog has
+   * one job: show what will run, and take the confirmation.
+   */
+  function act(action, row, param, label) {
+    setTyped('');
+    const next = { action, row, param, label, plan: null, preview: null };
     setDialog(next);
-    if (!needsChoice) fetchPreview(next);
+    fetchPreview(next);
   }
 
   /** Ask the server to build the statement, then preview what it would change. */
@@ -228,13 +266,24 @@ export default function OpsConsole() {
     );
   }
 
-  const summaryFields = SUMMARY_FIELDS[tableKey] || [];
+  /** Status options for one row, including its own value if it is not a known one. */
+  function statusOptions(current) {
+    const known = config.statuses || [];
+    if (!current || known.some((s) => s.value === current)) return known;
+    // Never silently show a different status than the row actually holds.
+    return [{ value: current, label: 'current value — not a known status' }, ...known];
+  }
 
   return (
     <>
       {/* ----------------------------------------------------------- toolbar */}
       <div className="ops-bar">
-        <select value={state} onChange={(e) => setState(e.target.value)} title="State">
+        <select
+          value={state}
+          onChange={(e) => setState(e.target.value)}
+          aria-label="State"
+          title="State"
+        >
           {config.states.map((s) => (
             <option key={s.group} value={s.group}>
               {s.group}
@@ -242,7 +291,12 @@ export default function OpsConsole() {
           ))}
         </select>
 
-        <select value={tableKey} onChange={(e) => setTableKey(e.target.value)} title="Table">
+        <select
+          value={tableKey}
+          onChange={(e) => setTableKey(e.target.value)}
+          aria-label="Table"
+          title="Table"
+        >
           {config.tableKeys.map((k) => (
             <option key={k} value={k}>
               {TABLE_LABELS[k] || k}
@@ -250,7 +304,14 @@ export default function OpsConsole() {
           ))}
         </select>
 
-        <select value={field} onChange={(e) => setField(e.target.value)} title="Search by">
+        <span className="ops-bar-sep" />
+
+        <select
+          value={field}
+          onChange={(e) => setField(e.target.value)}
+          aria-label="Search by"
+          title="Search by"
+        >
           {searchFields.map((f) => (
             <option key={f} value={f}>
               {f}
@@ -273,9 +334,6 @@ export default function OpsConsole() {
         <button type="button" className="btn btn-primary" onClick={() => load()} disabled={busy}>
           {busy ? '…' : 'Search'}
         </button>
-
-        <span className="topbar-spacer" />
-        <span className="faint mono-sm">{physicalTable || 'not in this state'}</span>
       </div>
 
       {notice ? (
@@ -295,47 +353,129 @@ export default function OpsConsole() {
       {/* -------------------------------------------------------------- rows */}
       <div className="panel" style={{ marginTop: 10 }}>
         <div className="panel-head">
-          <span>{result ? `${result.rowCount} row${result.rowCount === 1 ? '' : 's'}` : '—'}</span>
+          <span className="mono-sm">{physicalTable || 'not defined in this state'}</span>
+          <span className="faint" style={{ fontWeight: 400 }}>
+            {result ? `${result.rowCount} row${result.rowCount === 1 ? '' : 's'}` : '—'}
+          </span>
           <span className="topbar-spacer" />
-          {result ? <span className="mono-sm muted">{result.elapsedMs} ms</span> : null}
+          {result ? <span className="mono-sm faint">{result.elapsedMs} ms</span> : null}
         </div>
 
         {!result || result.rowCount === 0 ? (
           <div className="empty">{busy ? 'loading…' : 'nothing found'}</div>
         ) : (
-          <div>
-            {result.rows.map((row, i) => (
-              <div className="ops-item" key={row.id || i}>
-                <div className="ops-item-data">
-                  {summaryFields.map((f) =>
-                    row[f] === undefined || row[f] === null ? null : (
-                      <span className="ops-kv" key={f}>
-                        <span className="faint">{f}</span> {String(row[f])}
-                      </span>
-                    )
-                  )}
-                </div>
+          <div className="ops-table">
+            <div className="ops-row ops-row-head" style={{ gridTemplateColumns: template }}>
+              {columns.map((col) => (
+                <span key={col.key}>
+                  {col.kind === 'actions' ? '' : col.kind === 'status' ? 'appStatus' : col.key}
+                </span>
+              ))}
+            </div>
 
-                <div className="ops-item-actions">
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => setViewRow(row)}
-                  >
-                    view
-                  </button>
-                  {actions.map((a) => (
-                    <button
-                      key={a.action}
-                      type="button"
-                      className={`btn btn-sm${a.destructive ? ' btn-danger' : ''}`}
-                      disabled={busy || !row.id}
-                      onClick={() => openDialog(a, row)}
-                    >
-                      {a.label}
-                    </button>
-                  ))}
-                </div>
+            {result.rows.map((row, i) => (
+              <div
+                className="ops-row"
+                key={row.id || i}
+                style={{ gridTemplateColumns: template }}
+              >
+                {columns.map((col) => {
+                  /* ------------------------------------------- a plain field */
+                  if (col.kind === 'field') {
+                    const cell = row[col.key];
+                    return (
+                      <span className="ops-cell" key={col.key} title={String(cell ?? '')}>
+                        {cell === undefined || cell === null ? (
+                          <span className="cell-null">—</span>
+                        ) : (
+                          String(cell)
+                        )}
+                      </span>
+                    );
+                  }
+
+                  /* ------------------- the status, as the control it should be */
+                  if (col.kind === 'status') {
+                    return (
+                      <select
+                        key={col.key}
+                        className="ops-status-select"
+                        aria-label={`appStatus for ${row.custId || row.id}`}
+                        value={row.appStatus ?? ''}
+                        disabled={busy || !row.id}
+                        onChange={(e) =>
+                          act(statusAction, row, e.target.value, `appStatus → ${e.target.value}`)
+                        }
+                      >
+                        {row.appStatus == null ? <option value="">— not set —</option> : null}
+                        {statusOptions(row.appStatus).map((s) => (
+                          <option key={s.value} value={s.value}>
+                            {s.value}
+                          </option>
+                        ))}
+                      </select>
+                    );
+                  }
+
+                  /* ------------------------------------------------- controls */
+                  return (
+                    <span className="ops-cell-actions" key={col.key}>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setViewRow(row)}
+                      >
+                        view
+                      </button>
+
+                      {/* One menu instead of a row of buttons. Selecting an
+                          entry opens the same confirm dialog as before. */}
+                      {pathAction || otherActions.length ? (
+                        <select
+                          className="ops-action-select"
+                          aria-label={`Actions for ${row.custId || row.id}`}
+                          value=""
+                          disabled={busy || !row.id}
+                          onChange={(e) => {
+                            const [name, param] = e.target.value.split('::');
+                            e.target.value = ''; // a menu, not a value
+                            if (name === pathAction?.action) {
+                              act(pathAction, row, param, `clear ${param}`);
+                              return;
+                            }
+                            const chosen = otherActions.find((a) => a.action === name);
+                            if (chosen) act(chosen, row, undefined, chosen.label);
+                          }}
+                        >
+                          <option value="">actions…</option>
+
+                          {pathAction ? (
+                            <optgroup label="Clear a field">
+                              {(config.nullablePaths || []).map((p) => (
+                                <option
+                                  key={p.path}
+                                  value={`${pathAction.action}::${p.path}`}
+                                >
+                                  {p.path} → {p.clear}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ) : null}
+
+                          {otherActions.length ? (
+                            <optgroup label="Careful">
+                              {otherActions.map((a) => (
+                                <option key={a.action} value={a.action}>
+                                  {a.label}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ) : null}
+                        </select>
+                      ) : null}
+                    </span>
+                  );
+                })}
               </div>
             ))}
           </div>
@@ -348,53 +488,15 @@ export default function OpsConsole() {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <span>{dialog.action.destructive ? '⚠' : '✎'}</span>
-              <span>{dialog.action.label}</span>
+              <span>{dialog.label || dialog.action.label}</span>
               <span className="topbar-spacer" />
               <span className="faint mono-sm">{dialog.row.custId || dialog.row.id}</span>
             </div>
 
-            <div className="modal-body">
-              {/* step 1: the choice this action needs */}
+            <div className="modal-body stack-sm">
               {!dialog.plan ? (
-                <>
-                  {dialog.action.action === 'set-app-status' ? (
-                    <div className="stack-sm">
-                      <label className="rail-label" htmlFor="dlg-status">new appStatus</label>
-                      <select
-                        id="dlg-status"
-                        value={dialog.param}
-                        onChange={(e) => setDialog({ ...dialog, param: e.target.value })}
-                      >
-                        {config.statuses.map((s) => (
-                          <option key={s.value} value={s.value}>
-                            {s.value} — {s.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ) : null}
-
-                  {dialog.action.needsPath ? (
-                    <div className="stack-sm">
-                      <label className="rail-label" htmlFor="dlg-path">field to clear</label>
-                      <select
-                        id="dlg-path"
-                        value={dialog.param}
-                        onChange={(e) => setDialog({ ...dialog, param: e.target.value })}
-                      >
-                        {(config.nullablePaths || []).map((p) => (
-                          <option key={p.path} value={p.path}>
-                            {p.path} → {p.clear}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ) : null}
-
-                  {busy ? <div className="faint mono-sm">building…</div> : null}
-                </>
+                <div className="faint mono-sm">building the statement…</div>
               ) : (
-                /* step 2: what it will actually do */
                 <>
                   <div
                     className={`callout ${
@@ -405,13 +507,9 @@ export default function OpsConsole() {
                     <div>
                       <strong>{dialog.plan.summary}</strong>
                       <div className="mono-sm" style={{ marginTop: 4 }}>
-                        {dialog.plan.table}
+                        {dialog.plan.table} · {dialog.preview.countLabel ?? '?'} row(s) matched
                       </div>
                     </div>
-                  </div>
-
-                  <div className="faint mono-sm">
-                    {dialog.preview.countLabel ?? '?'} row(s) matched
                   </div>
 
                   <pre className="logbox" style={{ maxHeight: 120 }}>
@@ -444,25 +542,14 @@ export default function OpsConsole() {
               <button type="button" className="btn btn-ghost" onClick={() => setDialog(null)}>
                 Cancel
               </button>
-              {!dialog.plan ? (
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  disabled={busy}
-                  onClick={() => fetchPreview(dialog)}
-                >
-                  Preview
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className={dialog.action.destructive ? 'btn btn-danger' : 'btn btn-primary'}
-                  disabled={!typedOk || busy}
-                  onClick={confirm}
-                >
-                  Confirm
-                </button>
-              )}
+              <button
+                type="button"
+                className={dialog.action.destructive ? 'btn btn-danger' : 'btn btn-primary'}
+                disabled={!dialog.plan || !typedOk || busy}
+                onClick={confirm}
+              >
+                {dialog.action.destructive ? 'Run it' : 'Apply'}
+              </button>
             </div>
           </div>
         </div>

@@ -410,15 +410,15 @@ export default function BypassPanel({ target, onChanged }) {
                 const open = backupPlan?.backupId === backup.id;
                 return (
                   <div key={backup.id} className={`backup-row${open ? ' open' : ''}`}>
-                    <div className="ops-item" style={{ borderBottom: 'none' }}>
-                      <div className="ops-item-data">
-                        <span className="ops-kv">{formatWhen(backup.at)}</span>
-                        <span className="ops-kv">
+                    <div className="list-row" style={{ borderBottom: 'none' }}>
+                      <div className="list-row-data">
+                        <span className="list-kv">{formatWhen(backup.at)}</span>
+                        <span className="list-kv">
                           <span className="faint">by</span> {backup.by || '—'}
                         </span>
-                        <span className="ops-kv faint">{backup.id}</span>
+                        <span className="list-kv faint">{backup.id}</span>
                       </div>
-                      <div className="ops-item-actions">
+                      <div className="list-row-actions">
                         <button
                           type="button"
                           className="btn btn-ghost btn-sm"

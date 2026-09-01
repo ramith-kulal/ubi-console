@@ -96,16 +96,16 @@ export default function BypassPage() {
             {showAudit && data.audit.length ? (
               <div className="panel-body" style={{ padding: 0 }}>
                 {data.audit.map((entry, i) => (
-                  <div className="ops-item" key={`${entry.at}-${i}`}>
-                    <div className="ops-item-data">
-                      <span className="ops-kv">{formatWhen(entry.at)}</span>
-                      <span className="ops-kv">
+                  <div className="list-row" key={`${entry.at}-${i}`}>
+                    <div className="list-row-data">
+                      <span className="list-kv">{formatWhen(entry.at)}</span>
+                      <span className="list-kv">
                         <span className="faint">by</span> {entry.user || '—'}
                       </span>
                       <span className={`tag ${PHASE_TAG[entry.phase] || 'tag-danger'}`}>
                         {entry.phase}
                       </span>
-                      <span className="ops-kv">
+                      <span className="list-kv">
                         {(entry.changes || [])
                           .map((c) => `${c.key} ${JSON.stringify(c.from)} → ${JSON.stringify(c.to)}`)
                           .join('  ·  ') ||

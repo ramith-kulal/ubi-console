@@ -448,6 +448,44 @@ select:focus,
   border-color: color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
+/* A simple list row: a few labelled values on the left, controls on the right.
+   Used by the bypass backups list and the change history. */
+.list-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 11px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+.list-row:last-child {
+  border-bottom: none;
+}
+.list-row:hover {
+  background: var(--bg-hover);
+}
+.list-row-data {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1;
+}
+.list-kv {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.list-kv .faint {
+  margin-right: 3px;
+}
+.list-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+}
+
 .muted {
   color: var(--text-dim);
 }
@@ -1076,8 +1114,9 @@ table.grid tr.is-live:hover {
 
 /* ---------------------------------------------------- operations screen */
 
-/* One toolbar line: state, table, field, value, Search. Nothing that is only
-   needed at the moment of acting lives here — that is what the dialog is for. */
+/* One toolbar line: state, table, then search-by and the value. Nothing that is
+   only needed at the moment of acting lives here — that is what the row's own
+   controls and the dialog are for. */
 .ops-bar {
   display: flex;
   align-items: center;
@@ -1096,44 +1135,81 @@ table.grid tr.is-live:hover {
   flex: 1;
   min-width: 180px;
 }
-
-/* One line per record: the few fields worth scanning, then the actions. */
-.ops-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 7px 11px;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+.ops-bar-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+  margin: 0 3px;
 }
-.ops-item:last-child {
+
+/* Results as fixed columns with one header, not repeated field names per row:
+   a result set should be glanceable, and nothing lines up if every value
+   carries its own label. */
+/* Its own scrollport, so the header can stick over a 50-row result set. (.panel
+   sets overflow:hidden, so a sticky child of the panel would never stick.) */
+.ops-table {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  max-height: calc(100vh - 250px);
+  overflow: auto;
+}
+.ops-row {
+  display: grid;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 11px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+.ops-row:last-child {
   border-bottom: none;
 }
-.ops-item:hover {
+.ops-row:not(.ops-row-head):hover {
   background: var(--bg-hover);
 }
 
-.ops-item-data {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-  min-width: 0;
-  flex: 1;
-}
-.ops-kv {
-  font-family: var(--mono);
-  font-size: 11.5px;
-  white-space: nowrap;
-}
-.ops-kv .faint {
-  margin-right: 3px;
+.ops-row-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-inset);
+  color: var(--text-faint);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--border);
 }
 
-.ops-item-actions {
+.ops-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The status IS the control. Sized to the widest status value so the column
+   does not resize as rows change. */
+.ops-status-select {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 2px 6px;
+  width: 100%;
+}
+
+.ops-cell-actions {
   display: flex;
   align-items: center;
   gap: 5px;
-  flex: none;
+  justify-content: flex-end;
+}
+/* A menu, not a value: it always reads "actions…" and springs back after use. */
+.ops-action-select {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 2px 6px;
+  width: auto;
+  min-width: 92px;
+  color: var(--text-dim);
 }
 
 /* --------------------------------------------------------- bypass flags screen */
