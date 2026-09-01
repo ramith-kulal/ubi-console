@@ -158,9 +158,14 @@ as a valid one, and the backend then fails to boot on a file nobody kept a copy 
 `pm2 restart 0` addresses a process by index, and indexes move. And there was no record
 of who turned `V1_ENCRYPTION_BYPASS` on, or when.
 
-**Editing is local until "Review changes".** A mis-click on a switch must not be a
-restart of the backend. The review step is server-side, because the editable keys and
-their types come from the file, not from the browser:
+**Two clicks total: flip a switch, then press the one button that appears.** There is no
+separate review step and no confirm dialog — neither was earning its click. The pending
+change is printed as chips in a bar pinned to the bottom of the viewport, directly beside
+a red button that says what it will do (`Enable 1 bypass & restart`, or `Apply 3 changes
+& restart`). Editing is local, so nothing is sent until that button is pressed.
+
+The server still validates the change before writing, and the editable keys and their
+types come from the file, not from the browser:
 
 | Value in the file | Control | Accepted |
 |---|---|---|
@@ -170,7 +175,9 @@ their types come from the file, not from the browser:
 | `["bre_status", ...]` | text, comma-separated | `[A-Za-z0-9_.-]{1,64}` per entry, no duplicates |
 | `{ ... }`, `null`, mixed array | shown, not editable | — |
 
-Then confirm → `POST /api/bypass/apply`, streamed over SSE:
+The button then plans and applies in one go — `POST /api/bypass` mints a confirm token
+bound to the file's before/after digests, and `POST /api/bypass/apply` streams the write
+over SSE:
 
 - **backup** — the current file is copied to `.bypass-backups/bypass-<ts>-<user>.json`
   (beside the config file) *before* anything is written

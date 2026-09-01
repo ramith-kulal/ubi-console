@@ -28,6 +28,7 @@ function formatWhen(iso) {
 export default function BypassPage() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [showAudit, setShowAudit] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -53,17 +54,8 @@ export default function BypassPage() {
       <div className="page-head">
         <h1 className="page-title">Bypass flags</h1>
         <span className="page-sub">
-          edit → review → backup → atomic write → pm2 restart → verify → auto-restore
+          flip a switch, then apply · backup → write → restart → verify → auto-restore
         </span>
-      </div>
-
-      <div className="callout callout-warn" style={{ marginBottom: 13 }}>
-        <span className="callout-icon">⚠</span>
-        <div>
-          These flags switch off real checks — OTP verification, payload encryption, credit
-          bureau calls, name matching. Applying a change restarts the backend, so every
-          in-flight request is dropped. Every write is backed up and recorded below.
-        </div>
       </div>
 
       {error ? (
@@ -87,15 +79,23 @@ export default function BypassPage() {
         {data?.targets?.length ? (
           <div className="panel">
             <div className="panel-head">
-              <span>Recent changes</span>
+              <span>History</span>
+              <span className="faint" style={{ fontWeight: 400 }}>
+                {data.audit.length ? `${data.audit.length} recorded` : 'nothing recorded yet'}
+              </span>
               <span className="topbar-spacer" />
-              <span className="tag">{data.audit.length}</span>
+              <button
+                type="button"
+                className="head-link"
+                onClick={() => setShowAudit((v) => !v)}
+                disabled={data.audit.length === 0}
+              >
+                {showAudit ? 'hide' : 'show'}
+              </button>
             </div>
-            <div className="panel-body">
-              {data.audit.length === 0 ? (
-                <div className="empty">no changes recorded yet</div>
-              ) : (
-                data.audit.map((entry, i) => (
+            {showAudit && data.audit.length ? (
+              <div className="panel-body" style={{ padding: 0 }}>
+                {data.audit.map((entry, i) => (
                   <div className="ops-item" key={`${entry.at}-${i}`}>
                     <div className="ops-item-data">
                       <span className="ops-kv">{formatWhen(entry.at)}</span>
@@ -105,19 +105,17 @@ export default function BypassPage() {
                       <span className={`tag ${PHASE_TAG[entry.phase] || 'tag-danger'}`}>
                         {entry.phase}
                       </span>
-                      <span className="ops-kv faint">{entry.action}</span>
                       <span className="ops-kv">
                         {(entry.changes || [])
-                          .map(
-                            (c) => `${c.key}: ${JSON.stringify(c.from)} → ${JSON.stringify(c.to)}`
-                          )
-                          .join('  ·  ') || entry.restoredFrom || ''}
+                          .map((c) => `${c.key} ${JSON.stringify(c.from)} → ${JSON.stringify(c.to)}`)
+                          .join('  ·  ') ||
+                          (entry.restoredFrom ? `restored ${entry.restoredFrom}` : '')}
                       </span>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>
