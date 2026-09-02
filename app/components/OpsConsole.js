@@ -37,6 +37,23 @@ const SUMMARY_FIELDS = {
   CLOGIN: ['userName', 'mobileNo', 'email', 'staffId'],
 };
 
+/**
+ * Human column headings. The raw field name stays as the cell/heading tooltip,
+ * because it is what you type into the search box and what appears in the SQL.
+ */
+const FIELD_LABELS = {
+  custId: 'Customer ID',
+  applicant_name: 'Applicant',
+  mobile_no: 'Mobile',
+  acc_no: 'Account no.',
+  state: 'State',
+  userName: 'Username',
+  mobileNo: 'Mobile',
+  email: 'Email',
+  staffId: 'Staff ID',
+  appStatus: 'Application status',
+};
+
 /** Column widths, so ids and phone numbers do not wobble between rows. */
 const WIDTHS = {
   custId: '170px',
@@ -146,8 +163,18 @@ export default function OpsConsole() {
 
   const statusAction = actions.find((a) => a.action === 'set-app-status') || null;
   const pathAction = actions.find((a) => a.needsPath) || null;
-  /** Everything that is neither the status dropdown nor a path clear. */
-  const otherActions = actions.filter((a) => a.action !== 'set-app-status' && !a.needsPath);
+  /**
+   * Deleting a row gets its own button rather than an entry in a menu.
+   * Everything else in that menu is recoverable — a status can be set back, a
+   * cleared field can be re-fetched — and a delete is not, so it should not be
+   * one line below "clear docs.assets.bhoomi" in the same list.
+   */
+  const deleteAction = actions.find((a) => a.action.startsWith('delete-')) || null;
+  /** The rest: recoverable fixes, collected in one menu. */
+  const menuActions = actions.filter(
+    (a) => a !== statusAction && a !== deleteAction && !a.needsPath
+  );
+  const hasMenu = Boolean(pathAction || menuActions.length);
 
   /** The row's columns: fields, then the status dropdown, then the controls. */
   const columns = useMemo(() => {
@@ -157,12 +184,14 @@ export default function OpsConsole() {
       width: WIDTHS[key] || 'minmax(120px, 1fr)',
     }));
     if (statusAction) cols.push({ key: 'appStatus', kind: 'status', width: '250px' });
-    // Fixed, not `auto`: an auto column is empty in the header row and holds two
+    // Fixed, not `auto`: an auto column is empty in the header row and holds
     // controls in the data rows, so the flexible column would absorb a different
     // amount of space in each and the header would not line up with the values.
-    cols.push({ key: '__actions', kind: 'actions', width: '160px' });
+    const width = 58 + (hasMenu ? 104 : 0) + (deleteAction ? 74 : 0);
+    cols.push({ key: '__actions', kind: 'actions', width: `${width}px` });
     return cols;
-  }, [tableKey, statusAction]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableKey, statusAction, deleteAction, hasMenu]);
 
   const template = columns.map((c) => c.width).join(' ');
 
@@ -250,6 +279,9 @@ export default function OpsConsole() {
     !dialog?.preview?.requiresTypedConfirmation ||
     typed === (dialog.preview.typedConfirmationValue || dialog.preview.table || '');
 
+  /** A delete is worded and coloured differently from a recoverable change. */
+  const isDelete = Boolean(dialog?.action?.action?.startsWith('delete-'));
+
   if (configError) {
     return (
       <div className="callout callout-danger">
@@ -278,11 +310,14 @@ export default function OpsConsole() {
     <>
       {/* ----------------------------------------------------------- toolbar */}
       <div className="ops-bar">
+        <label className="ops-label" htmlFor="ops-state">
+          State
+        </label>
         <select
+          id="ops-state"
           value={state}
           onChange={(e) => setState(e.target.value)}
-          aria-label="State"
-          title="State"
+          title="Each state has its own tables — this picks which one you are looking at"
         >
           {config.states.map((s) => (
             <option key={s.group} value={s.group}>
@@ -291,11 +326,14 @@ export default function OpsConsole() {
           ))}
         </select>
 
+        <label className="ops-label" htmlFor="ops-table">
+          Records
+        </label>
         <select
+          id="ops-table"
           value={tableKey}
           onChange={(e) => setTableKey(e.target.value)}
-          aria-label="Table"
-          title="Table"
+          title="Which kind of record to work with"
         >
           {config.tableKeys.map((k) => (
             <option key={k} value={k}>
@@ -306,11 +344,14 @@ export default function OpsConsole() {
 
         <span className="ops-bar-sep" />
 
+        <label className="ops-label" htmlFor="ops-field">
+          Find by
+        </label>
         <select
+          id="ops-field"
           value={field}
           onChange={(e) => setField(e.target.value)}
-          aria-label="Search by"
-          title="Search by"
+          title="Which field to match on"
         >
           {searchFields.map((f) => (
             <option key={f} value={f}>
@@ -320,9 +361,10 @@ export default function OpsConsole() {
         </select>
 
         <input
+          id="ops-value"
           type="text"
           className="ops-bar-input"
-          placeholder={`${field} — blank for all`}
+          placeholder={`Type a ${field}, or leave blank to list every row`}
           value={value}
           autoComplete="off"
           onChange={(e) => setValue(e.target.value)}
@@ -332,7 +374,7 @@ export default function OpsConsole() {
         />
 
         <button type="button" className="btn btn-primary" onClick={() => load()} disabled={busy}>
-          {busy ? '…' : 'Search'}
+          {busy ? 'Searching…' : 'Search'}
         </button>
       </div>
 
@@ -353,22 +395,41 @@ export default function OpsConsole() {
       {/* -------------------------------------------------------------- rows */}
       <div className="panel" style={{ marginTop: 10 }}>
         <div className="panel-head">
-          <span className="mono-sm">{physicalTable || 'not defined in this state'}</span>
-          <span className="faint" style={{ fontWeight: 400 }}>
-            {result ? `${result.rowCount} row${result.rowCount === 1 ? '' : 's'}` : '—'}
+          <span>
+            {result
+              ? `${result.rowCount} row${result.rowCount === 1 ? '' : 's'}${
+                  result.rowCount === 50 ? ' (first 50)' : ''
+                }`
+              : '—'}
+          </span>
+          <span className="faint mono-sm" style={{ fontWeight: 400 }}>
+            {physicalTable ? `in ${physicalTable}` : 'this table is not defined for this state'}
           </span>
           <span className="topbar-spacer" />
           {result ? <span className="mono-sm faint">{result.elapsedMs} ms</span> : null}
         </div>
 
         {!result || result.rowCount === 0 ? (
-          <div className="empty">{busy ? 'loading…' : 'nothing found'}</div>
+          <div className="empty">
+            {busy ? (
+              'Searching…'
+            ) : value ? (
+              <>
+                No row where <span className="mono">{field}</span> is “{value}”.
+                <div className="faint" style={{ marginTop: 5 }}>
+                  Records are per state — check the State picker above if you expected one.
+                </div>
+              </>
+            ) : (
+              `No rows in ${physicalTable || 'this table'}.`
+            )}
+          </div>
         ) : (
           <div className="ops-table">
             <div className="ops-row ops-row-head" style={{ gridTemplateColumns: template }}>
               {columns.map((col) => (
-                <span key={col.key}>
-                  {col.kind === 'actions' ? '' : col.kind === 'status' ? 'appStatus' : col.key}
+                <span key={col.key} title={col.kind === 'actions' ? undefined : col.key}>
+                  {col.kind === 'actions' ? '' : FIELD_LABELS[col.key] || col.key}
                 </span>
               ))}
             </div>
@@ -423,48 +484,50 @@ export default function OpsConsole() {
                       <button
                         type="button"
                         className="btn btn-ghost btn-sm"
+                        title="See the whole row as JSON"
                         onClick={() => setViewRow(row)}
                       >
-                        view
+                        View
                       </button>
 
-                      {/* One menu instead of a row of buttons. Selecting an
-                          entry opens the same confirm dialog as before. */}
-                      {pathAction || otherActions.length ? (
+                      {/* The recoverable fixes, in one menu. Choosing an entry
+                          opens the same confirm dialog as everything else. */}
+                      {hasMenu ? (
                         <select
                           className="ops-action-select"
-                          aria-label={`Actions for ${row.custId || row.id}`}
+                          aria-label={`Fixes for ${row.custId || row.id}`}
+                          title="Clear a field, or run a fix on this row"
                           value=""
                           disabled={busy || !row.id}
                           onChange={(e) => {
                             const [name, param] = e.target.value.split('::');
                             e.target.value = ''; // a menu, not a value
                             if (name === pathAction?.action) {
-                              act(pathAction, row, param, `clear ${param}`);
+                              act(pathAction, row, param, `Clear ${param}`);
                               return;
                             }
-                            const chosen = otherActions.find((a) => a.action === name);
+                            const chosen = menuActions.find((a) => a.action === name);
                             if (chosen) act(chosen, row, undefined, chosen.label);
                           }}
                         >
-                          <option value="">actions…</option>
+                          <option value="">Fix…</option>
 
                           {pathAction ? (
-                            <optgroup label="Clear a field">
+                            <optgroup label="Clear a field on this row">
                               {(config.nullablePaths || []).map((p) => (
                                 <option
                                   key={p.path}
                                   value={`${pathAction.action}::${p.path}`}
                                 >
-                                  {p.path} → {p.clear}
+                                  {p.label || p.path} → {p.clear}
                                 </option>
                               ))}
                             </optgroup>
                           ) : null}
 
-                          {otherActions.length ? (
-                            <optgroup label="Careful">
-                              {otherActions.map((a) => (
+                          {menuActions.length ? (
+                            <optgroup label="Start part of the journey again">
+                              {menuActions.map((a) => (
                                 <option key={a.action} value={a.action}>
                                   {a.label}
                                 </option>
@@ -472,6 +535,18 @@ export default function OpsConsole() {
                             </optgroup>
                           ) : null}
                         </select>
+                      ) : null}
+
+                      {deleteAction ? (
+                        <button
+                          type="button"
+                          className="btn btn-danger-ghost btn-sm"
+                          disabled={busy || !row.id}
+                          title={`${deleteAction.label} — cannot be undone`}
+                          onClick={() => act(deleteAction, row, undefined, deleteAction.label)}
+                        >
+                          Delete
+                        </button>
                       ) : null}
                     </span>
                   );
@@ -495,7 +570,7 @@ export default function OpsConsole() {
 
             <div className="modal-body stack-sm">
               {!dialog.plan ? (
-                <div className="faint mono-sm">building the statement…</div>
+                <div className="faint mono-sm">Working out what this would change…</div>
               ) : (
                 <>
                   <div
@@ -503,15 +578,21 @@ export default function OpsConsole() {
                       dialog.action.destructive ? 'callout-danger' : 'callout-warn'
                     }`}
                   >
-                    <span className="callout-icon">⚠</span>
+                    <span className="callout-icon">{isDelete ? '⛔' : '⚠'}</span>
                     <div>
                       <strong>{dialog.plan.summary}</strong>
-                      <div className="mono-sm" style={{ marginTop: 4 }}>
-                        {dialog.plan.table} · {dialog.preview.countLabel ?? '?'} row(s) matched
+                      <div style={{ marginTop: 4 }}>
+                        {isDelete
+                          ? 'The row will be gone. This cannot be undone from here.'
+                          : 'Nothing has run yet — this happens when you confirm.'}
+                      </div>
+                      <div className="mono-sm faint" style={{ marginTop: 5 }}>
+                        {dialog.plan.table} · matches {dialog.preview.countLabel ?? '?'} row(s)
                       </div>
                     </div>
                   </div>
 
+                  <div className="faint mono-sm">The exact statement that will run:</div>
                   <pre className="logbox" style={{ maxHeight: 120 }}>
                     {dialog.plan.sql}
                   </pre>
@@ -519,11 +600,11 @@ export default function OpsConsole() {
                   {dialog.preview.requiresTypedConfirmation ? (
                     <div className="stack-sm">
                       <label className="rail-label" htmlFor="dlg-typed">
-                        type{' '}
+                        Type{' '}
                         <strong>
                           {dialog.preview.typedConfirmationValue || dialog.preview.table}
                         </strong>{' '}
-                        to confirm
+                        below to enable the button
                       </label>
                       <input
                         id="dlg-typed"
@@ -548,7 +629,11 @@ export default function OpsConsole() {
                 disabled={!dialog.plan || !typedOk || busy}
                 onClick={confirm}
               >
-                {dialog.action.destructive ? 'Run it' : 'Apply'}
+                {isDelete
+                  ? 'Delete permanently'
+                  : dialog.action.destructive
+                    ? 'Yes, run it'
+                    : 'Apply change'}
               </button>
             </div>
           </div>

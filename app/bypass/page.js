@@ -54,7 +54,7 @@ export default function BypassPage() {
       <div className="page-head">
         <h1 className="page-title">Bypass flags</h1>
         <span className="page-sub">
-          flip a switch, then apply · backup → write → restart → verify → auto-restore
+          turn a check off or on — the file is backed up and the backend restarted for you
         </span>
       </div>
 

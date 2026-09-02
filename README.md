@@ -336,11 +336,17 @@ Two interaction rules it follows:
   in a single sticky header. Repeating `custId … applicant_name …` on every row meant
   nothing lined up, so scanning a result set was reading rather than glancing.
 
-The remaining actions (clear a field, reset a land record, delete) are one `actions…`
-menu per row instead of four buttons; the field-clear allowlist from `NULLABLE_PATHS` is
-an option group inside it. Every entry still goes plan → `/api/query/preview` → confirm →
-`/api/query/execute`, so the affected-row count, the exact statement, and any typed
-confirmation are unchanged.
+**Delete is its own button; recoverable fixes share a menu.** A status can be set back
+and a cleared field can be re-fetched, so those live in one `Fix…` menu per row (the
+field-clear allowlist from `NULLABLE_PATHS` is an option group inside it). A delete
+cannot be undone, so it does not belong one line below "clear docs.assets.bhoomi" in the
+same list — it is a separate `Delete` button, styled as an outline rather than solid red:
+a column of solid red buttons down a 50-row list shouts louder than the action deserves
+and trains the eye to ignore it.
+
+Every one of them still goes plan → `/api/query/preview` → confirm →
+`/api/query/execute`, so the affected-row count, the exact statement, and the typed
+confirmation on a delete are unchanged.
 
 ### Row editing
 
@@ -380,5 +386,10 @@ npm run gen-tables    # needs the ubi-backend checkout; pass --source if it move
 
 ### Saved queries
 
-Clicking a saved query **loads it into the editor and nothing more**. There is
-deliberately no one-click path from the list to a destructive statement.
+Opening a saved query **loads it into the editor and nothing more** — "Open in Terminal"
+says where the text goes. There is deliberately no one-click path from the list to a
+destructive statement.
+
+Deleting a saved query asks inline before it goes. It is not a database write, so it has
+no confirm token, but it is still someone else's work being thrown away by the button
+next to the one you wanted, and this list has no undo.
