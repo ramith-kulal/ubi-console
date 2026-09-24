@@ -16,5 +16,14 @@
     "restartCommand": ["pm2", "restart", "ubi-frontend"],
     "healthUrl": "http://127.0.0.1:4201/",
     "keepReleases": 5
+  },
+  "priv-etb-ntb-frontend": {
+    "label": "ETB/NTB Customer Frontend (priv)",
+    "pm2Name": "priv-frontend-etb-ntb",
+    "liveLink": "/home/ubi-backend/priv-frontend/ubi-dist",
+    "releasesDir": "/home/ubi-backend/priv-frontend/releases",
+    "restartCommand": ["pm2", "restart", "priv-frontend-etb-ntb"],
+    "healthUrl": "http://127.0.0.1:4202/",
+    "keepReleases": 5
   }
 }
